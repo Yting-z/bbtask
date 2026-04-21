@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>团队手账 · 琉璃光年</title>
+    <!-- Firebase SDK (模块化) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ---------- 请替换为您的 Firebase 项目配置 ----------
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        // -------------------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 暴露到全局，以便 HTML 内联事件调用
+        window.auth = auth;
+        window.db = db;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signOut = signOut;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.collection = collection;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.getDocs = getDocs;
+        window.query = query;
+        window.where = where;
+        window.onSnapshot = onSnapshot;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.orderBy = orderBy;
+        window.Timestamp = Timestamp;
+    </script>
+    <style>
+        /* ========== 原手账完整样式（琉璃光年） ========== */
+        :root {
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --color-text-primary: #1a1a1a;
+            --color-text-secondary: #666;
+            --color-background-primary: #ffffff;
+            --color-background-secondary: #f8f9fa;
+            --border-radius-md: 8px;
+            --border-radius-lg: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 8px 25px rgba(0,0,0,0.15);
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            font-family: var(--font-sans);
+            color: var(--color-text-primary);
+            background: linear-gradient(rgba(102, 126, 234, 0.55), rgba(118, 75, 162, 0.55)),
+                        url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+CiAgPGRlZnM+CiAgICA8ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+CiAgICAgIDxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjY1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+CiAgICA8L2ZpbHRlcj4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0iZ2x5cGgiIGN4PSI1MCUiIGN5PSI1MCUiIHI9IjcwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMC4yIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIwLjA0Ii8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dseXBoKSIvPgogIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNub2lzZUZpbHRlcikiIG9wYWNpdHk9IjAuMTgiLz4KPC9zdmc+') center/cover no-repeat;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 320px minmax(0, 1fr);
+            gap: 20px;
+            height: 100vh;
+            padding: 1.5rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .panel {
+            min-width: 0;
+            border-radius: var(--border-radius-lg);
+            border: 1px solid rgba(255,255,255,0.55);
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 0.3s ease, border-color 0.3s ease;
+            height: 100%;
+        }
+
+        .panel-header {
+            padding: 1.2rem;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            position: relative;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 0.8rem;
+            position: relative;
+            z-index: 1;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .add-input-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .add-input-group input, .add-input-group select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid rgba(102,126,234,0.3);
+            border-radius: var(--border-radius-md);
+            background: rgba(255,255,255,0.9);
+        }
+        button {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(102,126,234,0.45);
+            border-radius: var(--border-radius-md);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.25s ease;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .list-item, .task-card {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(102,126,234,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .list-item:hover, .task-card:hover {
+            background: rgba(102,126,234,0.08);
+        }
+        .task-card.completed {
+            opacity: 0.6;
+            background: rgba(200,255,200,0.8);
+        }
+        .task-top-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .task-text {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .empty-state {
+            padding: 2rem;
+            text-align: center;
+            color: var(--color-text-secondary);
+        }
+        .right-panel-empty {
+            padding: 2rem;
+            text-align: center;
+            color: #999;
+        }
+        .badge {
+            font-size: 11px;
+            background: rgba(79,172,254,0.2);
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        .task-meta {
+            font-size: 11px;
+            color: #27ae60;
+            margin-top: 4px;
+        }
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-family: inherit;
+        }
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-card {
+            width: 360px;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(16px);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .login-card input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+        }
+        .login-card button {
+            width: 100%;
+            margin-top: 8px;
+        }
+        .logout-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(255,255,255,0.9);
+            border-radius: 40px;
+            padding: 8px 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 登录/注册界面 -->
+    <div id="loginView" class="login-container" style="display: flex;">
+        <div class="login-card">
+            <h2 style="margin-bottom: 1.5rem;">📘 手账登录</h2>
+            <input type="email" id="loginEmail" placeholder="邮箱" />
+            <input type="password" id="loginPassword" placeholder="密码" />
+            <button onclick="handleLogin()">登录</button>
+            <button onclick="showRegister()" style="background: #f0f0f0; margin-top: 8px;">注册新账号</button>
+        </div>
+    </div>
+    <div id="registerView" class="login-container" style="display: none;">
+        <div class="login-card">
+            <h2>📝 注册</h2>
+            <input type="email" id="regEmail" placeholder="邮箱" />
+            <input type="password" id="regPassword" placeholder="密码" />
+            <button onclick="handleRegister()">注册</button>
+            <button onclick="showLogin()" style="background: #f0f0f0;">返回登录</button>
+            <p style="font-size: 12px; margin-top: 16px; color:#666;">* 第一个注册的账号自动成为管理员（请使用 admin@example.com 作为管理员邮箱）</p>
+        </div>
+    </div>
+
+    <!-- 主应用界面 -->
+    <div id="mainApp" style="display: none;">
+        <div class="main-container">
+            <!-- 左侧：员工列表（仅管理员可见） -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">👥 团队成员</div>
+                    <div class="add-input-group" id="adminAddUserArea" style="display: none;">
+                        <input type="email" id="newEmployeeEmail" placeholder="员工邮箱" />
+                        <button onclick="addEmployeeByEmail()">添加员工</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="userListPanel">
+                    <div class="empty-state">加载中...</div>
+                </div>
+            </div>
+            <!-- 中间：任务列表 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📋 任务列表</div>
+                    <div class="add-input-group" id="adminAddTaskArea" style="display: none;">
+                        <select id="taskAssigneeSelect"></select>
+                        <input type="text" id="newTaskTitle" placeholder="任务标题" />
+                        <button onclick="createTask()">分配任务</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="taskListPanel">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </div>
+            <!-- 右侧：任务备注 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📝 备注与详情</div>
+                </div>
+                <div class="panel-content" id="taskDetailPanel">
+                    <div class="right-panel-empty">点击任务查看详情</div>
+                </div>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="logout()">🚪 退出登录</button>
+    </div>
+</div>
+
+<script>
+    // ---------- 全局变量 ----------
+    let currentUser = null;      // Firebase 用户对象
+    let currentUserRole = null;  // "admin" 或 "employee"
+    let currentUserId = null;
+    let tasksUnsubscribe = null;
+    let usersUnsubscribe = null;
+    let selectedTaskId = null;
+
+    // 辅助函数
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // 显示登录/注册界面切换
+    window.showRegister = () => {
+        document.getElementById('loginView').style.display = 'none';
+        document.getElementById('registerView').style.display = 'flex';
+    };
+    window.showLogin = () => {
+        document.getElementById('registerView').style.display = 'none';
+        document.getElementById('loginView').style.display = 'flex';
+    };
+
+    // 处理登录
+    window.handleLogin = async () => {
+        const email = document.getElementById('loginEmail').value;
+        const pwd = document.getElementById('loginPassword').value;
+        try {
+            const userCred = await signInWithEmailAndPassword(auth, email, pwd);
+            // 登录成功后会触发 onAuthStateChanged
+        } catch (err) {
+            alert('登录失败: ' + err.message);
+        }
+    };
+
+    // 处理注册（自动分配角色：如果是预设管理员邮箱则设为admin，否则employee）
+    window.handleRegister = async () => {
+        const email = document.getElementById('regEmail').value;
+        const pwd = document.getElementById('regPassword').value;
+        if (!email || !pwd) {
+            alert('请填写邮箱和密码');
+            return;
+        }
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
+            const uid = userCred.user.uid;
+            // 判断是否为管理员邮箱（可自定义，例如 admin@example.com）
+            const isAdmin = (email === 'admin@example.com');
+            const role = isAdmin ? 'admin' : 'employee';
+            // 在 Firestore 中创建用户文档
+            await setDoc(doc(db, 'users', uid), {
+                email: email,
+                role: role,
+                createdAt: new Date()
+            });
+            alert(`注册成功！您的角色：${role}`);
+            showLogin();
+        } catch (err) {
+            alert('注册失败: ' + err.message);
+        }
+    };
+
+    // 退出登录
+    window.logout = async () => {
+        await signOut(auth);
+    };
+
+    // 管理员：添加员工（通过邮箱，需要在 Authentication 中已存在用户）
+    window.addEmployeeByEmail = async () => {
+        if (currentUserRole !== 'admin') return;
+        const email = document.getElementById('newEmployeeEmail').value.trim();
+        if (!email) return;
+        // 查找该邮箱对应的用户（需要查询 users 集合，如果不存在则提示先注册）
+        const q = query(collection(db, 'users'), where('email', '==', email));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            alert('该邮箱尚未注册，请让该员工先自行注册账号，然后再次添加。');
+            return;
+        }
+        const userDoc = snap.docs[0];
+        const userData = userDoc.data();
+        if (userData.role === 'admin') {
+            alert('该用户已经是管理员');
+            return;
+        }
+        // 更新 role 为 employee（其实已经是，但确保）
+        await updateDoc(doc(db, 'users', userDoc.id), { role: 'employee' });
+        alert('已添加为员工');
+        document.getElementById('newEmployeeEmail').value = '';
+        loadUsers(); // 刷新列表
+    };
+
+    // 加载所有员工（仅管理员）
+    async function loadUsers() {
+        if (currentUserRole !== 'admin') return;
+        const q = query(collection(db, 'users'), where('role', '==', 'employee'));
+        const snapshot = await getDocs(q);
+        const container = document.getElementById('userListPanel');
+        const assigneeSelect = document.getElementById('taskAssigneeSelect');
+        if (!container) return;
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="empty-state">暂无员工，请先添加</div>';
+            assigneeSelect.innerHTML = '<option value="">无员工</option>';
+            return;
+        }
+        let usersHtml = '';
+        assigneeSelect.innerHTML = '<option value="">选择员工</option>';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            usersHtml += `<div class="list-item">${escapeHtml(data.email)}</div>`;
+            assigneeSelect.innerHTML += `<option value="${doc.id}">${escapeHtml(data.email)}</option>`;
+        });
+        container.innerHTML = usersHtml;
+    }
+
+    // 实时加载任务列表（根据角色过滤）
+    function loadTasksRealtime() {
+        if (tasksUnsubscribe) tasksUnsubscribe();
+        let q;
+        if (currentUserRole === 'admin') {
+            q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+        } else {
+            q = query(collection(db, 'tasks'), where('assigneeId', '==', currentUserId), orderBy('createdAt', 'desc'));
+        }
+        tasksUnsubscribe = onSnapshot(q, async (snapshot) => {
+            const tasks = [];
+            snapshot.forEach(doc => {
+                tasks.push({ id: doc.id, ...doc.data() });
+            });
+            // 获取员工邮箱映射（管理员用）
+            let emailMap = new Map();
+            if (currentUserRole === 'admin') {
+                const usersSnap = await getDocs(collection(db, 'users'));
+                usersSnap.forEach(d => { emailMap.set(d.id, d.data().email); });
+            }
+            const container = document.getElementById('taskListPanel');
+            if (tasks.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无任务</div>';
+                return;
+            }
+            container.innerHTML = tasks.map(task => {
+                const isCompleted = task.completed || false;
+                const assigneeName = currentUserRole === 'admin' ? (emailMap.get(task.assigneeId) || '未知') : '';
+                return `
+                    <div class="task-card ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}" onclick="selectTask('${task.id}')">
+                        <div class="task-top-row">
+                            ${currentUserRole === 'admin' ? `<input type="checkbox" ${isCompleted ? 'checked' : ''} onchange="toggleTaskComplete('${task.id}', this.checked)" onclick="event.stopPropagation()" />` : ''}
+                            <div class="task-text">${escapeHtml(task.title)}</div>
+                            ${assigneeName ? `<span class="badge">👤 ${escapeHtml(assigneeName)}</span>` : ''}
+                        </div>
+                        ${task.description ? `<div class="task-meta">📝 ${escapeHtml(task.description.substring(0, 50))}</div>` : ''}
+                        ${isCompleted ? `<div class="task-meta">✅ 已完成</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        });
+    }
+
+    // 选择任务，显示详情和备注编辑
+    window.selectTask = async (taskId) => {
+        selectedTaskId = taskId;
+        const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+        if (!taskDoc.exists()) return;
+        const task = taskDoc.data();
+        const detailDiv = document.getElementById('taskDetailPanel');
+        const isAdmin = (currentUserRole === 'admin');
+        detailDiv.innerHTML = `
+            <div style="padding: 1.2rem;">
+                <h3>${escapeHtml(task.title)}</h3>
+                <label>备注（可编辑）：</label>
+                <textarea id="taskDescTextarea" rows="4" style="width:100%; margin-top:8px;">${escapeHtml(task.description || '')}</textarea>
+                <button onclick="updateTaskDescription()" style="margin-top:12px;">保存备注</button>
+                ${isAdmin ? `<button onclick="deleteTask()" style="margin-left:8px; background:#faa;">删除任务</button>` : ''}
+                <div style="margin-top:16px; font-size:12px; color:#888;">
+                    分配时间：${task.createdAt ? new Date(task.createdAt.toDate()).toLocaleString() : '未知'}
+                </div>
+            </div>
+        `;
+    };
+
+    // 更新任务备注
+    window.updateTaskDescription = async () => {
+        if (!selectedTaskId) return;
+        const newDesc = document.getElementById('taskDescTextarea').value;
+        await updateDoc(doc(db, 'tasks', selectedTaskId), {
+            description: newDesc
+        });
+        alert('备注已保存');
+    };
+
+    // 管理员：切换任务完成状态
+    window.toggleTaskComplete = async (taskId, completed) => {
+        if (currentUserRole !== 'admin') {
+            alert('只有管理员可以标记任务完成');
+            return;
+        }
+        await updateDoc(doc(db, 'tasks', taskId), {
+            completed: completed,
+            completedAt: completed ? new Date() : null
+        });
+    };
+
+    // 管理员：创建任务
+    window.createTask = async () => {
+        if (currentUserRole !== 'admin') return;
+        const title = document.getElementById('newTaskTitle').value.trim();
+        const assigneeId = document.getElementById('taskAssigneeSelect').value;
+        if (!title || !assigneeId) {
+            alert('请填写任务标题并选择员工');
+            return;
+        }
+        await addDoc(collection(db, 'tasks'), {
+            title: title,
+            description: '',
+            assigneeId: assigneeId,
+            creatorId: currentUserId,
+            completed: false,
+            createdAt: new Date(),
+            dueDate: null
+        });
+        document.getElementById('newTaskTitle').value = '';
+        alert('任务已分配，员工将实时看到');
+    };
+
+    // 管理员：删除任务
+    window.deleteTask = async () => {
+        if (currentUserRole !== 'admin' || !selectedTaskId) return;
+        if (confirm('确定删除此任务？')) {
+            await deleteDoc(doc(db, 'tasks', selectedTaskId));
+            selectedTaskId = null;
+            document.getElementById('taskDetailPanel').innerHTML = '<div class="right-panel-empty">任务已删除</div>';
+        }
+    };
+
+    // 监听认证状态变化
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUserId = user.uid;
+            // 获取用户角色
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+                currentUserRole = userDoc.data().role;
+                currentUser = user;
+                // 切换界面
+                document.getElementById('loginView').style.display = 'none';
+                document.getElementById('registerView').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                // 根据角色显示/隐藏管理员控件
+                const isAdmin = (currentUserRole === 'admin');
+                document.getElementById('adminAddUserArea').style.display = isAdmin ? 'flex' : 'none';
+                document.getElementById('adminAddTaskArea').style.display = isAdmin ? 'flex' : 'none';
+                if (isAdmin) {
+                    loadUsers();
+                } else {
+                    document.getElementById('userListPanel').innerHTML = '<div class="empty-state">员工视图：只能查看自己的任务</div>';
+                }
+                loadTasksRealtime();
+            } else {
+                // 用户文档不存在，提示重新注册
+                alert('用户信息不完整，请重新注册');
+                await signOut(auth);
+            }
+        } else {
+            // 未登录
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('loginView').style.display = 'flex';
+            document.getElementById('registerView').style.display = 'none';
+            if (tasksUnsubscribe) tasksUnsubscribe();
+            if (usersUnsubscribe) usersUnsubscribe();
+        }
+    });
+
+    // 初次加载时，如果没有用户，显示登录界面
+    window.addEventListener('load', () => {
+        // 确保 Firebase 初始化完成
+    });
+</script>
+</body>
+</html>
