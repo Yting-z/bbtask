@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>我的网站</title>
+</head>
+<body>
+    <h1>✅ 网站运行正常</h1>
+    <p><a href="task.html">进入任务系统</a></p>
+</body>
+</html>
